@@ -36,6 +36,8 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import static org.apache.dubbo.common.utils.PojoUtils.realize;
 
@@ -43,13 +45,15 @@ import static org.apache.dubbo.common.utils.PojoUtils.realize;
  * InvokeTelnetHandler
  */
 @Activate
-@Help(parameter = "[service.]method(args) ", summary = "Invoke the service method.",
+@Help(parameter = "[service.]method(args) [version='1.0']", summary = "Invoke the service method.",
         detail = "Invoke the service method.")
 public class InvokeTelnetHandler implements TelnetHandler {
 
     public static final String INVOKE_MESSAGE_KEY = "telnet.invoke.method.message";
     public static final String INVOKE_METHOD_LIST_KEY = "telnet.invoke.method.list";
     public static final String INVOKE_METHOD_PROVIDER_KEY = "telnet.invoke.method.provider";
+
+    public static final String INVOKE_VERSION_MATCH_REGEX_KEY = "version='((\\d)+(.(\\d+))?){1}'";
 
     @Override
     @SuppressWarnings("unchecked")
@@ -76,6 +80,13 @@ public class InvokeTelnetHandler implements TelnetHandler {
             method = method.substring(i + 1).trim();
         }
 
+        String version = null;
+        Pattern pattern = Pattern.compile(INVOKE_VERSION_MATCH_REGEX_KEY);
+        Matcher matcher = pattern.matcher(message);
+        if (matcher.find()) {
+            version = matcher.group(1);
+        }
+
         List<Object> list;
         try {
             list = JSON.parseArray("[" + args + "]", Object.class);
@@ -90,7 +101,7 @@ public class InvokeTelnetHandler implements TelnetHandler {
             invokeMethod = (Method) channel.getAttribute(SelectTelnetHandler.SELECT_METHOD_KEY);
         } else {
             for (ProviderModel provider : ApplicationModel.allProviderModels()) {
-                if (isServiceMatch(service, provider)) {
+                if (isServiceMatch(service, provider) && isServiceVersionMatch(provider, version)) {
                     selectedProvider = provider;
                     List<Method> methodList = findSameSignatureMethod(provider.getAllMethods(), method, list);
                     if (CollectionUtils.isNotEmpty(methodList)) {
@@ -157,6 +168,15 @@ public class InvokeTelnetHandler implements TelnetHandler {
                 || provider.getServiceInterfaceClass().getSimpleName().equalsIgnoreCase(service)
                 || provider.getServiceInterfaceClass().getName().equalsIgnoreCase(service)
                 || StringUtils.isEmpty(service);
+    }
+
+    private boolean isServiceVersionMatch(ProviderModel provider, String version) {
+        if (StringUtils.isEmpty(version)) {
+            return true;
+        } else {
+            String providerVersion = provider.getServiceConfig().getServiceMetadata().getVersion();
+            return version.equalsIgnoreCase(providerVersion);
+        }
     }
 
     private List<Method> findSameSignatureMethod(Set<MethodDescriptor> methods, String lookupMethodName, List<Object> args) {
