@@ -195,6 +195,7 @@ public class ExtensionLoader_Adaptive_Test {
         Ext2 ext = ExtensionLoader.getExtensionLoader(Ext2.class).getAdaptiveExtension();
 
         Map<String, String> map = new HashMap<String, String>();
+        //此处就可以获取到自适应的扩展点实现。
         map.put("ext2", "impl1");
         URL url = new URL("p1", "1.2.3.4", 1010, "path1", map);
 
